@@ -1,5 +1,5 @@
 import { App, MarkdownView } from 'obsidian';
-import { PluginSettings, TagInfo } from '../types';
+import { PluginSettings, TagInfo, TagMatchDetail } from '../types';
 import { getIsWildCard } from './tagSearch';
 
 /**
@@ -35,6 +35,29 @@ const _parseContent = (
 		after: match.groups.after ?? '',
 	};
 };
+
+const _yieldMarkdownForTagDetails = (details: TagMatchDetail[]) => 
+	details
+		// Group by file
+		.reduce<{fileLink: string, stringsContainingTag: string[]}[]>((acc, {fileLink, stringContainingTag}) => {
+			if(!stringContainingTag.trim().startsWith('-')){
+				stringContainingTag = `- ${stringContainingTag}`
+			}
+			const existing = acc.find(fileGroup => fileGroup.fileLink === fileLink)
+			if(existing){
+				existing.stringsContainingTag.push(stringContainingTag)
+			} else {
+				acc.push({fileLink: fileLink, stringsContainingTag: [stringContainingTag]})
+			}
+			return acc;
+		}, [])
+		// Process each tagMatch detail in this group
+		.map(({ stringsContainingTag, fileLink }) => 
+			`> [!quote]+ In ${fileLink}
+${stringsContainingTag.map(str => `> ${str}`).join('\n')}
+`
+		)
+
 /**
  * Generates the content for a tag page.
  *
@@ -87,17 +110,13 @@ tags:
 			tagPageContent.push(`### ${baseTag}`);
 
 			// Process each tagMatch detail in this group
-			details.forEach(({ stringContainingTag, fileLink }) => {
-				processTagMatch(stringContainingTag, fileLink, tagPageContent);
-			});
+			tagPageContent.push(..._yieldMarkdownForTagDetails(details))
 		});
 	} else {
 		// If there's only one baseTag, process all tagMatches normally without subheaders
 		tagsInfo.forEach((details) => {
-			details.forEach(({ stringContainingTag, fileLink }) => {
-				// Assuming there's only one baseTag, we can directly use the first (and only) key of groupedTags
-				processTagMatch(stringContainingTag, fileLink, tagPageContent);
-			});
+			// Assuming there's only one baseTag, we can directly use the first (and only) key of groupedTags
+			tagPageContent.push(..._yieldMarkdownForTagDetails(details))
 		});
 	}
 
@@ -151,29 +170,6 @@ export const extractFrontMatterTagValue = (
 		}
 	}
 };
-
-/**
- * Processes a single tag match, formatting it according to the specified logic and appending it to the provided content array.
- * If the tag match starts with a markdown bullet ('-'), the function formats the first line with the file link and preserves the rest as is.
- * Otherwise, it prefixes the tag match with a markdown bullet, highlights the base tag within the match, and appends the file link.
- *
- * @param {string} fullTag - The full tag match string, which may include additional content beyond the base tag.
- * @param {string} fileLink - The URL or path to the file associated with the tag match.
- * @param {string[]} tagPageContent - The array to which the formatted tag match will be appended. This array accumulates the content for a page or section.
- */
-function processTagMatch(
-	fullTag: string,
-	fileLink: string,
-	tagPageContent: string[],
-) {
-	if (fullTag.trim().startsWith('-')) {
-		const [firstBullet, ...bullets] = fullTag.split('\n');
-		const firstBulletWithLink = `${firstBullet} ${fileLink}`;
-		tagPageContent.push([firstBulletWithLink, ...bullets].join('\n'));
-	} else {
-		tagPageContent.push(`- ${fullTag} ${fileLink}`);
-	}
-}
 
 /**
  * Checks if the provided tags match the tag of interest, including wildcard patterns.
