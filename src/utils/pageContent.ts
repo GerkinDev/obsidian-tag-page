@@ -55,7 +55,12 @@ export const generateTagPageContent: GenerateTagPageContentFn = async (
 	// Generate list of links to files with this tag
 	const tagPageContent: string[] = [];
 	tagPageContent.push(
-		`---\n${settings.frontmatterQueryProperty}: "${tagOfInterest}"\n---`,
+		`---
+${settings.frontmatterQueryProperty}: "${tagOfInterest}"
+tags:
+  - tag-page-md
+  - ${tagOfInterest.slice(1) /* Omit the leading # */}
+---`,
 	);
 
 	// Try to extract comments from the page to spot injection placeholder
@@ -103,7 +108,7 @@ export const generateTagPageContent: GenerateTagPageContentFn = async (
 			const metaMatter =
 				app.metadataCache.getFileCache(file)?.frontmatter;
 			return metaMatter?.tags
-				? matchesTagOfInterest(metaMatter.tags, tagOfInterest)
+				? metaMatter?.[settings.frontmatterQueryProperty] !== tagOfInterest && matchesTagOfInterest(metaMatter.tags, tagOfInterest)
 				: false;
 		})
 		.map((file) => `- [[${file.basename}]]`);
