@@ -23,14 +23,15 @@ export type GenerateTagPageContentFn = (
 
 const _parseContent = (
 	baseContent: string,
-): { before: string; after: string } => {
+) => {
 	const match = baseContent.match(
 		/^(?<frontmatter>---\n.*?\n---\n)?(?:(?<before>.*?)\n)?(?<tagpage>%%\ntag-page-md.*?tag-page-md end\n%%)(?:\n(?<after>.*?))?$/s,
 	);
 	if (!match || !match.groups) {
-		return { before: '', after: '' };
+		return { frontmatter: '', before: '', after: '' };
 	}
 	return {
+		frontmatter: match.groups.frontmatter ?? '',
 		before: match.groups.before ?? '',
 		after: match.groups.after ?? '',
 	};
@@ -77,17 +78,13 @@ export const generateTagPageContent: GenerateTagPageContentFn = async (
 ): Promise<string> => {
 	// Generate list of links to files with this tag
 	const tagPageContent: string[] = [];
-	tagPageContent.push(
-		`---
-${settings.frontmatterQueryProperty}: "${tagOfInterest}"
-tags:
-  - tag-page-md
-  - ${tagOfInterest.slice(1) /* Omit the leading # */}
----`,
-	);
 
 	// Try to extract comments from the page to spot injection placeholder
-	const { before, after } = _parseContent(baseContent);
+	const { frontmatter, before, after } = _parseContent(baseContent);
+
+	if(frontmatter){
+		tagPageContent.push(frontmatter);
+	}
 
 	if (before) {
 		tagPageContent.push(before);
